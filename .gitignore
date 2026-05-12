@@ -1,0 +1,33 @@
+# Go build files
+*.exe
+*.test
+*.out
+coverage.out
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes / temp
+tmp/
+data/
+
+# Generated local binary
+server
+server.exe
+membership-service
+membership-service.exe
+
+# Test cache
+*.prof

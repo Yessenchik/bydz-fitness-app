@@ -1,0 +1,208 @@
+syntax = "proto3";
+
+package membership;
+
+option go_package = "membership-service/proto";
+
+import "google/protobuf/timestamp.proto";
+
+// MembershipAccessService is the main gRPC API for gym memberships,
+// user subscriptions, attendance registration, access control and statistics.
+service MembershipAccessService {
+  // Membership plans
+  rpc CreateMembershipPlan(CreateMembershipPlanRequest) returns (MembershipPlanResponse);
+  rpc GetMembershipPlan(GetMembershipPlanRequest) returns (MembershipPlanResponse);
+  rpc ListMembershipPlans(ListMembershipPlansRequest) returns (ListMembershipPlansResponse);
+  rpc UpdateMembershipPlan(UpdateMembershipPlanRequest) returns (MembershipPlanResponse);
+  rpc DeleteMembershipPlan(DeleteMembershipPlanRequest) returns (DeleteMembershipPlanResponse);
+
+  // Subscriptions
+  rpc CreateSubscription(CreateSubscriptionRequest) returns (SubscriptionResponse);
+  rpc GetUserSubscription(GetUserSubscriptionRequest) returns (SubscriptionResponse);
+  rpc ExtendSubscription(ExtendSubscriptionRequest) returns (SubscriptionResponse);
+  rpc CancelSubscription(CancelSubscriptionRequest) returns (CancelSubscriptionResponse);
+  rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
+
+  // Attendance
+  rpc RegisterAttendance(RegisterAttendanceRequest) returns (AttendanceResponse);
+  rpc GetUserAttendanceHistory(GetUserAttendanceHistoryRequest) returns (GetUserAttendanceHistoryResponse);
+  rpc GetMonthlyAttendanceStats(GetMonthlyAttendanceStatsRequest) returns (MonthlyAttendanceStatsResponse);
+
+  // Admin
+  rpc GetGlobalStats(GetGlobalStatsRequest) returns (GlobalStatsResponse);
+}
+
+enum SubscriptionStatus {
+  SUBSCRIPTION_STATUS_UNSPECIFIED = 0;
+  SUBSCRIPTION_STATUS_ACTIVE = 1;
+  SUBSCRIPTION_STATUS_EXPIRED = 2;
+  SUBSCRIPTION_STATUS_CANCELLED = 3;
+}
+
+message MembershipPlan {
+  string id = 1;
+  string name = 2;
+  int32 duration_months = 3;
+  double price = 4;
+  string description = 5;
+  bool is_deleted = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message Subscription {
+  string id = 1;
+  string user_id = 2;
+  string membership_plan_id = 3;
+  google.protobuf.Timestamp start_date = 4;
+  google.protobuf.Timestamp end_date = 5;
+  bool is_active = 6;
+  SubscriptionStatus status = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message Attendance {
+  string id = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp check_in_time = 3;
+  string date = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// ==========================
+// Membership plan requests
+// ==========================
+
+message CreateMembershipPlanRequest {
+  string name = 1;
+  int32 duration_months = 2;
+  double price = 3;
+  string description = 4;
+}
+
+message GetMembershipPlanRequest {
+  string id = 1;
+}
+
+message ListMembershipPlansRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message UpdateMembershipPlanRequest {
+  string id = 1;
+  string name = 2;
+  int32 duration_months = 3;
+  double price = 4;
+  string description = 5;
+}
+
+message DeleteMembershipPlanRequest {
+  string id = 1;
+}
+
+message DeleteMembershipPlanResponse {
+  bool success = 1;
+}
+
+message MembershipPlanResponse {
+  MembershipPlan plan = 1;
+}
+
+message ListMembershipPlansResponse {
+  repeated MembershipPlan plans = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+// ==========================
+// Subscription requests
+// ==========================
+
+message CreateSubscriptionRequest {
+  string user_id = 1;
+  string membership_plan_id = 2;
+  string user_email = 3;
+}
+
+message GetUserSubscriptionRequest {
+  string user_id = 1;
+}
+
+message ExtendSubscriptionRequest {
+  string user_id = 1;
+  string membership_plan_id = 2;
+}
+
+message CancelSubscriptionRequest {
+  string user_id = 1;
+}
+
+message CancelSubscriptionResponse {
+  bool success = 1;
+}
+
+message SubscriptionResponse {
+  Subscription subscription = 1;
+}
+
+// ==========================
+// Access control requests
+// ==========================
+
+message CheckAccessRequest {
+  string user_id = 1;
+}
+
+message CheckAccessResponse {
+  bool allowed = 1;
+  string reason = 2;
+}
+
+// ==========================
+// Attendance requests
+// ==========================
+
+message RegisterAttendanceRequest {
+  string user_id = 1;
+}
+
+message AttendanceResponse {
+  Attendance attendance = 1;
+}
+
+message GetUserAttendanceHistoryRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetUserAttendanceHistoryResponse {
+  repeated Attendance attendances = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetMonthlyAttendanceStatsRequest {
+  string user_id = 1;
+}
+
+message MonthlyAttendanceStatsResponse {
+  string user_id = 1;
+  int64 visits_this_month = 2;
+  int64 visits_last_month = 3;
+  int64 total_visits = 4;
+}
+
+// ==========================
+// Admin stats
+// ==========================
+
+message GetGlobalStatsRequest {}
+
+message GlobalStatsResponse {
+  int64 active_subscriptions_count = 1;
+  int64 visits_this_month = 2;
+  int64 total_visits = 3;
+}
