@@ -1,0 +1,54 @@
+# macOS
+.DS_Store
+
+# env
+.env
+.env.*
+!.env.example
+
+# binaries
+*.exe
+*.out
+*.test
+*.dll
+*.so
+*.dylib
+
+# Go
+bin/
+tmp/
+vendor/
+
+# Air
+.air/
+tmp/
+
+# IDE
+.idea/
+.vscode/
+
+# logs
+*.log
+
+# Docker
+docker-data/
+
+# generated protobuf
+*.pb.go
+
+# coverage
+coverage.out
+coverage.html
+
+# node
+node_modules/
+
+# frontend build
+dist/
+build/
+
+# Grafana
+grafana-data/
+
+# OS
+Thumbs.db

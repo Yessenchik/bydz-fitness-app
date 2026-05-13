@@ -1,9 +1,0 @@
-DROP INDEX IF EXISTS idx_audit_user_id;
-DROP TABLE IF EXISTS user_audit_log;
-DROP TABLE IF EXISTS email_verification_tokens;
-DROP TABLE IF EXISTS password_reset_tokens;
-DROP INDEX IF EXISTS idx_users_created_at;
-DROP INDEX IF EXISTS idx_users_role;
-DROP INDEX IF EXISTS idx_users_email;
-DROP TABLE IF EXISTS users;
-DROP TYPE IF EXISTS user_role;

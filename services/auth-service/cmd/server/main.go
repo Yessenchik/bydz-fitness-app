@@ -1,120 +1,116 @@
 package main
 
 import (
-	"context"
+	"database/sql"
+	"fmt"
+	"log"
 	"net"
 	"net/http"
-	"os/signal"
-	"syscall"
 
-	"github.com/jmoiron/sqlx"
-	"github.com/nats-io/nats.go"
+	_ "github.com/lib/pq"
+
+	authv1 "github.com/Yessenchik/bydz-fitness-app/services/auth-service/gen/proto/auth/v1"
+
+	"github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/config"
+	grpcHandler "github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/delivery/grpc"
+	jwtManager "github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/infrastructure/jwt"
+	natsPublisher "github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/infrastructure/nats"
+	redisClient "github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/infrastructure/redis"
+	"github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/logger"
+	"github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/metrics"
+	authMiddleware "github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/middleware"
+	postgresRepo "github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/repository/postgres"
+	"github.com/Yessenchik/bydz-fitness-app/services/auth-service/internal/usecase"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
 
-	"github.com/Yessenchik/bydz-fitness-app/user-auth-service/config"
-	pb "github.com/Yessenchik/bydz-fitness-app/user-auth-service/gen/userauth/v1"
-	deliveryGRPC "github.com/Yessenchik/bydz-fitness-app/user-auth-service/internal/delivery/grpc"
-	infraEmail "github.com/Yessenchik/bydz-fitness-app/user-auth-service/internal/infrastructure/email"
-	infraNATS "github.com/Yessenchik/bydz-fitness-app/user-auth-service/internal/infrastructure/nats"
-	infraPG "github.com/Yessenchik/bydz-fitness-app/user-auth-service/internal/infrastructure/postgres"
-	infraRedis "github.com/Yessenchik/bydz-fitness-app/user-auth-service/internal/infrastructure/redis"
-	"github.com/Yessenchik/bydz-fitness-app/user-auth-service/internal/usecase"
-	"github.com/Yessenchik/bydz-fitness-app/user-auth-service/pkg/logger"
-	"github.com/Yessenchik/bydz-fitness-app/user-auth-service/pkg/tracing"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
 	cfg := config.Load()
 
-	// ── Логгер ──────────────────────────────
-	log, err := logger.New(cfg.App.IsDev)
+	zapLogger, err := logger.New()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	defer log.Sync()
+	defer zapLogger.Sync()
 
-	// ── Tracing ─────────────────────────────
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	metrics.Register()
 
-	tp, err := tracing.InitTracer(ctx, "user-auth-service", cfg.App.OTLPEndpoint)
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Println("metrics server running on :9101")
+
+		if err := http.ListenAndServe(":9101", nil); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	dsn := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		cfg.PostgresHost,
+		cfg.PostgresPort,
+		cfg.PostgresUser,
+		cfg.PostgresPassword,
+		cfg.AuthDB,
+		cfg.PostgresSSLMode,
+	)
+
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatal("init tracer", zap.Error(err))
+		log.Fatal(err)
 	}
-	defer tp.Shutdown(ctx)
 
-	// ── PostgreSQL ───────────────────────────
-	db, err := sqlx.ConnectContext(ctx, "postgres", cfg.Postgres.DSN)
-	if err != nil {
-		log.Fatal("connect postgres", zap.Error(err))
+	if err := db.Ping(); err != nil {
+		log.Fatal(err)
 	}
 	defer db.Close()
 
-	// ── Redis ────────────────────────────────
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     cfg.Redis.Addr,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-	})
-	defer rdb.Close()
+	userRepo := postgresRepo.NewUserRepository(db)
 
-	// ── NATS ─────────────────────────────────
-	nc, err := nats.Connect(cfg.NATS.URL)
+	jwtMgr := jwtManager.NewJWTManager(cfg.JWTSecret)
+
+	redisAddr := fmt.Sprintf("%s:%s", cfg.RedisHost, cfg.RedisPort)
+	redis := redisClient.NewClient(redisAddr)
+
+	natsURL := fmt.Sprintf("nats://%s:%s", cfg.NATSHost, cfg.NATSPort)
+	publisher, err := natsPublisher.NewPublisher(natsURL)
 	if err != nil {
-		log.Fatal("connect nats", zap.Error(err))
+		log.Fatal(err)
 	}
-	defer nc.Drain()
+	defer publisher.Close()
 
-	// ── Infrastructure ───────────────────────
-	userRepo := infraPG.NewUserRepository(db, log)
-	cacheRepo := infraRedis.NewCacheRepository(rdb)
-	publisher := infraNATS.NewPublisher(nc, log)
-	emailSvc := infraEmail.NewSMTPService(
-		cfg.SMTP.Host, cfg.SMTP.Port,
-		cfg.SMTP.Username, cfg.SMTP.Password,
-		cfg.App.BaseURL, log,
+	authUC := usecase.NewAuthUsecase(
+		userRepo,
+		jwtMgr,
+		redis,
+		publisher,
 	)
-	tokenMgr := infraPG.NewJWTManager(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret)
 
-	// ── Usecases ─────────────────────────────
-	authUC := usecase.NewAuthUsecase(userRepo, cacheRepo, publisher, emailSvc, tokenMgr, log)
-	userUC := usecase.NewUserUsecase(userRepo, cacheRepo, publisher, log)
+	handler := grpcHandler.NewHandler(authUC)
 
-	// ── gRPC Server ──────────────────────────
-	grpcServer := grpc.NewServer(
+	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			deliveryGRPC.UnaryTracingInterceptor(),
-			deliveryGRPC.UnaryLoggingInterceptor(log),
-			deliveryGRPC.UnaryAuthInterceptor(tokenMgr, cacheRepo),
+			authMiddleware.LoggingInterceptor(zapLogger),
+			authMiddleware.MetricsInterceptor(),
+			authMiddleware.AuthInterceptor(jwtMgr),
 		),
 	)
-	pb.RegisterUserAuthServiceServer(grpcServer, deliveryGRPC.NewHandler(authUC, userUC, log))
 
-	// ── Prometheus HTTP ───────────────────────
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		if err := http.ListenAndServe(":9090", nil); err != nil {
-			log.Error("metrics server", zap.Error(err))
-		}
-	}()
+	authv1.RegisterAuthServiceServer(server, handler)
 
-	// ── Listen ───────────────────────────────
-	lis, err := net.Listen("tcp", cfg.GRPC.Port)
+	reflection.Register(server)
+
+	lis, err := net.Listen("tcp", ":"+cfg.AuthGRPCPort)
 	if err != nil {
-		log.Fatal("listen", zap.Error(err))
+		log.Fatal(err)
 	}
-	log.Info("gRPC server started", zap.String("addr", cfg.GRPC.Port))
 
-	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatal("serve grpc", zap.Error(err))
-		}
-	}()
+	log.Printf("auth-service running on :%s\n", cfg.AuthGRPCPort)
 
-	<-ctx.Done()
-	log.Info("shutting down...")
-	grpcServer.GracefulStop()
+	if err := server.Serve(lis); err != nil {
+		log.Fatal(err)
+	}
 }
