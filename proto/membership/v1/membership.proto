@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package membership.v1;
+
+option go_package = "github.com/Yessenchik/bydz-fitness-app/services/membership-service/gen/proto/membership/v1;membershipv1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service MembershipService {
+rpc CreatePlan(CreatePlanRequest) returns (Plan);
+rpc GetPlan(GetPlanRequest) returns (Plan);
+rpc ListPlans(ListPlansRequest) returns (ListPlansResponse);
+rpc UpdatePlan(UpdatePlanRequest) returns (Plan);
+rpc DeletePlan(DeletePlanRequest) returns (google.protobuf.Empty);
+
+rpc CreateSubscription(CreateSubscriptionRequest) returns (Subscription);
+rpc GetSubscription(GetSubscriptionRequest) returns (Subscription);
+rpc GetActiveSubscription(GetActiveSubscriptionRequest) returns (Subscription);
+rpc ListUserSubscriptions(ListUserSubscriptionsRequest) returns (ListUserSubscriptionsResponse);
+rpc CancelSubscription(CancelSubscriptionRequest) returns (Subscription);
+rpc ExtendSubscription(ExtendSubscriptionRequest) returns (Subscription);
+rpc ValidateMembership(ValidateMembershipRequest) returns (ValidateMembershipResponse);
+rpc ExpireSubscription(ExpireSubscriptionRequest) returns (Subscription);
+}
+
+enum SubscriptionStatus {
+SUBSCRIPTION_STATUS_UNSPECIFIED = 0;
+SUBSCRIPTION_STATUS_PENDING = 1;
+SUBSCRIPTION_STATUS_ACTIVE = 2;
+SUBSCRIPTION_STATUS_CANCELLED = 3;
+SUBSCRIPTION_STATUS_EXPIRED = 4;
+}
+
+message Plan {
+string plan_id = 1;
+string name = 2;
+int32 duration_days = 3;
+int64 price_kzt = 4;
+bool is_active = 5;
+google.protobuf.Timestamp created_at = 6;
+google.protobuf.Timestamp updated_at = 7;
+}
+
+message Subscription {
+string subscription_id = 1;
+string user_id = 2;
+string plan_id = 3;
+SubscriptionStatus status = 4;
+google.protobuf.Timestamp starts_at = 5;
+google.protobuf.Timestamp expires_at = 6;
+google.protobuf.Timestamp cancelled_at = 7;
+google.protobuf.Timestamp created_at = 8;
+google.protobuf.Timestamp updated_at = 9;
+}
+
+message CreatePlanRequest {
+string name = 1;
+int32 duration_days = 2;
+int64 price_kzt = 3;
+}
+
+message GetPlanRequest {
+string plan_id = 1;
+}
+
+message ListPlansRequest {
+bool only_active = 1;
+}
+
+message ListPlansResponse {
+repeated Plan plans = 1;
+}
+
+message UpdatePlanRequest {
+string plan_id = 1;
+string name = 2;
+int32 duration_days = 3;
+int64 price_kzt = 4;
+bool is_active = 5;
+}
+
+message DeletePlanRequest {
+string plan_id = 1;
+}
+
+message CreateSubscriptionRequest {
+string user_id = 1;
+string plan_id = 2;
+}
+
+message GetSubscriptionRequest {
+string subscription_id = 1;
+}
+
+message GetActiveSubscriptionRequest {
+string user_id = 1;
+}
+
+message ListUserSubscriptionsRequest {
+string user_id = 1;
+}
+
+message ListUserSubscriptionsResponse {
+repeated Subscription subscriptions = 1;
+}
+
+message CancelSubscriptionRequest {
+string subscription_id = 1;
+}
+
+message ExtendSubscriptionRequest {
+string subscription_id = 1;
+int32 extra_days = 2;
+}
+
+message ValidateMembershipRequest {
+string user_id = 1;
+}
+
+message ValidateMembershipResponse {
+bool is_valid = 1;
+string reason = 2;
+Subscription subscription = 3;
+}
+
+message ExpireSubscriptionRequest {
+string subscription_id = 1;
+}

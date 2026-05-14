@@ -22,6 +22,26 @@ services:
     - "${AUTH_GRPC_EXTERNAL_PORT}:${AUTH_GRPC_PORT}"
     - "9101:9101"
 
+  membership-service:
+    build:
+      context: ..
+      dockerfile: services/membership-service/Dockerfile.dev
+    container_name: bydz-membership-service
+    restart: unless-stopped
+    working_dir: /app/services/membership-service
+    env_file:
+      - ../.env.docker
+    volumes:
+      - ../services/membership-service:/app/services/membership-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    ports:
+      - "${MEMBERSHIP_GRPC_EXTERNAL_PORT}:${MEMBERSHIP_GRPC_PORT}"
+      - "${MEMBERSHIP_METRICS_PORT}:${MEMBERSHIP_METRICS_PORT}"
+
   postgres:
     image: postgres:16-alpine
     container_name: bydz-postgres
@@ -56,9 +76,7 @@ services:
     image: nats:2.10-alpine
     container_name: bydz-nats
     restart: unless-stopped
-
-    command: ["-m", "8222"]
-
+    command: [ "-js", "-m", "8222" ]
     ports:
       - "${NATS_PORT}:4222"
       - "8222:8222"
