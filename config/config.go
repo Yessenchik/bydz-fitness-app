@@ -48,10 +48,11 @@ func Load() *Config {
 			RefreshSecret: mustEnv("JWT_REFRESH_SECRET"),
 		},
 		SMTP: SMTPConfig{
-			Host:     getEnv("SMTP_HOST", "smtp.gmail.com"),
-			Port:     getEnv("SMTP_PORT", "587"),
-			Username: mustEnv("SMTP_USERNAME"),
-			Password: mustEnv("SMTP_PASSWORD"),
+			Host: getEnv("SMTP_HOST", "smtp.gmail.com"),
+			Port: getEnv("SMTP_PORT", "587"),
+			// ЖЕСТКО ПРОПИСЫВАЕМ ДАННЫЕ БЕЗ getEnv:
+			Username: "bekbaulykalymzan@gmail.com",
+			Password: "adewiwbkzdvcefqj",
 		},
 		App: AppConfig{
 			BaseURL:      getEnv("APP_BASE_URL", "http://localhost:8080"),

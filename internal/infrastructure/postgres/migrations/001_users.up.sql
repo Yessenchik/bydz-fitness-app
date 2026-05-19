@@ -29,7 +29,7 @@ CREATE INDEX idx_users_created_at ON users (created_at DESC);
 -- Токены сброса пароля
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
                                                      user_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token      VARCHAR(128) NOT NULL,
+    token      VARCHAR(255) NOT NULL,
     expires_at TIMESTAMPTZ  NOT NULL,
 
     CONSTRAINT prt_user_id_unique UNIQUE (user_id),
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 -- Токены верификации email
 CREATE TABLE IF NOT EXISTS email_verification_tokens (
                                                          user_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token      VARCHAR(128) NOT NULL,
+    token      VARCHAR(255) NOT NULL,
     expires_at TIMESTAMPTZ  NOT NULL,
 
     CONSTRAINT evt_user_id_unique UNIQUE (user_id),

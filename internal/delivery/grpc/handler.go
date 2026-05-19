@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -279,6 +280,7 @@ func domainErrToStatus(err error) error {
 	case errors.Is(err, domain.ErrWeakPassword):
 		return status.Error(codes.InvalidArgument, err.Error())
 	default:
+		fmt.Printf("🔴 РЕАЛЬНАЯ ОШИБКА БЭКЕНДА: %v\n", err)
 		return status.Error(codes.Internal, "internal server error")
 	}
 }
